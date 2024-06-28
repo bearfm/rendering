@@ -1,0 +1,38 @@
+[
+  {
+    "arguments": [
+      "/nix/store/4a7g4s02vr57jccasyawfwmwnw9v0bpv-clang-wrapper-18.1.7/bin/clang++",
+      "-g",
+      "-ggdb",
+      "-Wall",
+      "-D_REENTRANT",
+      "-I/nix/store/lpi5hzzqkxccv3lrxfwz7zcsg1z4mgb5-SDL2-2.30.3-dev/include",
+      "-I/nix/store/lpi5hzzqkxccv3lrxfwz7zcsg1z4mgb5-SDL2-2.30.3-dev/include/SDL2",
+      "-c",
+      "-o",
+      "build/include/VkBootstrap.o",
+      "src/include/VkBootstrap.cpp"
+    ],
+    "directory": "/home/bear/.app/render",
+    "file": "/home/bear/.app/render/src/include/VkBootstrap.cpp",
+    "output": "/home/bear/.app/render/build/include/VkBootstrap.o"
+  },
+  {
+    "arguments": [
+      "/nix/store/4a7g4s02vr57jccasyawfwmwnw9v0bpv-clang-wrapper-18.1.7/bin/clang++",
+      "-g",
+      "-ggdb",
+      "-Wall",
+      "-D_REENTRANT",
+      "-I/nix/store/lpi5hzzqkxccv3lrxfwz7zcsg1z4mgb5-SDL2-2.30.3-dev/include",
+      "-I/nix/store/lpi5hzzqkxccv3lrxfwz7zcsg1z4mgb5-SDL2-2.30.3-dev/include/SDL2",
+      "-c",
+      "-o",
+      "build/main/render.o",
+      "src/main/render.cpp"
+    ],
+    "directory": "/home/bear/.app/render",
+    "file": "/home/bear/.app/render/src/main/render.cpp",
+    "output": "/home/bear/.app/render/build/main/render.o"
+  }
+]

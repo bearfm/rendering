@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+
+# Give ourselves a new namespace.
+if ! [ $FCODE_UNSHARED ]; then
+	FCODE_UNSHARED=1 exec unshare -rm "$0" "${@}"
+fi
+
+# Need real mount to avoid NixOS SUID wrapper
+# https://github.com/NixOS/nixpkgs/issues/42117
+REALMNT="/run/current-system/sw/bin/mount"
+
+# Temporary dir to set everything up in
+TMPROOT="$(mktemp -d -t fcodeXXXXXX)"
+
+# Mount tmpfs to store overlayfs work files; makes things cleaner outside the namespace.
+"$REALMNT" -t tmpfs tmpfs "${TMPROOT}"
+
+# Make overlayfs subdirectories.
+mkdir "${TMPROOT}/upper" "${TMPROOT}/work" "${TMPROOT}/mnt"
+
+# Mount overlayfs. TODO: this does not escape $TMPROOT properly
+"$REALMNT" -t overlay overlay -o "lowerdir=${HOME}/.config/Code,upperdir=${TMPROOT}/upper,workdir=${TMPROOT}/work" "$TMPROOT/mnt"
+
+# Start vscode as a user. NOTE: chrome-sandbox still needs suid, so we need to disable it atm :\
+unshare -U -- code -n --no-sandbox --user-data-dir "${TMPROOT}/mnt" "${@}"
