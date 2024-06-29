@@ -123,7 +123,6 @@ int main(int argc, char** argv) {
 
         const Uint8 *keyboardState = SDL_GetKeyboardState(nullptr);
 
-        // Handle continuous key presses
         if (keyboardState[SDL_SCANCODE_W]) {
             cameraPos += newCamSpeed * cameraDirection;
         }
