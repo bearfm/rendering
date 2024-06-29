@@ -10,7 +10,6 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
 	      buildInputs = with pkgs; [
-	          vulkan-loader
             SDL2
             SDL2_image
             SDL2_mixer
@@ -20,9 +19,7 @@
 	          pkg-config
             clang_18
             glslang
-            vulkan-headers
-            vulkan-loader
-            vulkan-validation-layers
+            glew
             glm
           ];
 

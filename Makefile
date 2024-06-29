@@ -10,24 +10,17 @@ BLUE         := $(shell tput -Txterm setaf 6)
 WHITE        := $(shell tput -Txterm setaf 7)
 RESET        := $(shell tput -Txterm sgr0)
 
-COMMONFLAGS := -g -ggdb -Wall -fms-extensions
+COMMONFLAGS := -g -ggdb -Wall
 
-CFLAGS := $(COMMONFLAGS) $(shell pkg-config --cflags sdl2)
+CFLAGS := $(COMMONFLAGS) $(shell pkg-config --cflags sdl2) $(shell pkg-config --cflags gl) $(shell pkg-config --cflags glew)
 
-LDFLAGS := $(COMMONFLAGS) -lvulkan $(shell pkg-config --libs sdl2)
+LDFLAGS := $(COMMONFLAGS) $(shell pkg-config --libs sdl2) $(shell pkg-config --libs gl) $(shell pkg-config --libs glew)
 
 SOURCES_DIR := src
 BUILD_DIR := build
-SHADERS_DIR := shaders
 
 SOURCES := $(wildcard $(SOURCES_DIR)/**/**/**/*.cpp $(SOURCES_DIR)/**/**/*.cpp $(SOURCES_DIR)/**/*.cpp $(SOURCES_DIR)/*.cpp)
 HEADERS := $(wildcard $(SOURCES_DIR)/**/**/**/*.hpp $(SOURCES_DIR)/**/**/*.hpp $(SOURCES_DIR)/**/*.hpp $(SOURCES_DIR)/*.hpp)
-
-SHADERS := $(wildcard $(SHADERS_DIR)/*.frag)
-SHADERS += $(wildcard $(SHADERS_DIR)/*.vert)
-
-SHADERS_SPV := $(SHADERS:.frag=.frag.spv)
-SHADERS_SPV := $(SHADERS_SPV:.vert=.vert.spv)
 
 OBJECTS := $(patsubst $(SOURCES_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES))
 
@@ -42,11 +35,6 @@ $(BUILD_DIR)/%.o: $(SOURCES_DIR)/%.cpp $(HEADERS)
 	@mkdir -p $(dir $@)
 	@$(CC) $(CFLAGS) -c $< -o $@
 
-$(SHADERS_DIR)/%.frag.spv: $(SHADERS_DIR)/%.frag
-	glslangValidator -V $< -o $@
-
-$(SHADERS_DIR)/%.vert.spv: $(SHADERS_DIR)/%.vert
-	glslangValidator -V $< -o $@
 
 clean:
 	rm -frv $(BUILD_DIR)/**
@@ -56,8 +44,6 @@ debug:
 
 run:
 	$(BUILD_DIR)/$(TARGET)
-
-shaders: $(SHADERS_SPV)
 
 .PHONY: clean debug run
 

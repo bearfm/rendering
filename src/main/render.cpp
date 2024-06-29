@@ -1,202 +1,118 @@
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+
 #include <iostream>
 #include "render.hpp"
+#include "../engine/object/object.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include "../include/tiny_gltf.hpp"
 
-const std::vector<Vertex> vertices = {
-        {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-        {{0.0f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}}
-};
+bool loadModel(const std::string& filePath, std::vector<float>& vertices, std::vector<unsigned int>& indices) {
+    tinygltf::Model model;
+    tinygltf::TinyGLTF loader;
+
+    std::string err;
+    std::string warn;
+
+    bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, filePath);
+
+    if (!warn.empty()) {
+        std::cout << "Warning: " << warn << std::endl;
+    }
+
+    if (!err.empty()) {
+        std::cerr << "Error: " << err << std::endl;
+        return false;
+    }
+
+    if (!ret) {
+        std::cerr << "Failed to load GLTF/GLB file" << std::endl;
+        return false;
+    }
+
+    if (!model.meshes.empty()) {
+        const auto& mesh = model.meshes[0];
+        const auto& primitive = mesh.primitives[0];
+
+        if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
+            const auto& accessor = model.accessors[primitive.indices];
+            const auto& bufferView = model.bufferViews[accessor.bufferView];
+            const auto& buffer = model.buffers[bufferView.buffer];
+
+            const unsigned char* data_ptr = buffer.data.data() + bufferView.byteOffset + accessor.byteOffset;
+            const int* indices_ptr = reinterpret_cast<const int*>(data_ptr);
+            int num_indices = accessor.count;
+
+            indices.reserve(num_indices);
+            for (int i = 0; i < num_indices; ++i) {
+                indices.push_back(static_cast<unsigned int>(indices_ptr[i]));
+            }
+
+            if (primitive.attributes.find("POSITION") != primitive.attributes.end()) {
+                const auto& positionAccessor = model.accessors[primitive.attributes.at("POSITION")];
+                const auto& positionBufferView = model.bufferViews[positionAccessor.bufferView];
+                const auto& positionBuffer = model.buffers[positionBufferView.buffer];
+
+                const float* positions_ptr = reinterpret_cast<const float*>(positionBuffer.data.data() + positionBufferView.byteOffset + positionAccessor.byteOffset);
+                int num_positions = positionAccessor.count;
+
+                vertices.reserve(num_positions * 3);
+
+                for (int i = 0; i < num_positions * 3; ++i) {
+                    vertices.push_back(positions_ptr[i]);
+                }
+            } else {
+                std::cerr << "No POSITION attribute found in the mesh" << std::endl;
+                return false;
+            }
+        } else {
+            std::cerr << "Unsupported primitive mode: " << primitive.mode << std::endl;
+            return false;
+        }
+    } else {
+        std::cerr << "No meshes found in the GLTF/GLB file" << std::endl;
+        return false;
+    }
+
+    return true;
+}
 
 int main(int argc, char** argv) {
     Window window;
-    VkRender render(&window);
 
-    const int MAX_FRAMES_IN_FLIGHT = 2;
-    std::vector<VkSemaphore> imageAvailableSemaphores(MAX_FRAMES_IN_FLIGHT);
-    std::vector<VkSemaphore> renderFinishedSemaphores(MAX_FRAMES_IN_FLIGHT);
-    std::vector<VkFence> inFlightFences(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-
-    VkSemaphoreCreateInfo semaInfo = {};
-    semaInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    VkFenceCreateInfo fenceInfo = {};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-    
-
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        auto renderer = render.getRenderer();
-        if (vkCreateSemaphore(renderer.device, &semaInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(renderer.device, &semaInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS) {
-                std::cerr << "CREATE SEMA ERR" << std::endl;
-                window.~Window(); // kill yourself! (literally)
-                render.~VkRender(); // kill yourself! (literally)
-                THROW();
-            }
-
-        if (vkCreateFence(renderer.device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
-            std::cerr << "CREATE FENCE ERR" << std::endl;
-            window.~Window(); // kill yourself! (literally)
-            render.~VkRender(); // kill yourself! (literally)
-            THROW();
-        }
+    if (glewInit() != GLEW_OK) {
+        std::cerr << "Glew init failed." << std::endl;
+        window.~Window();
+        std::runtime_error("Glew init failed.");
     }
 
-    VkBuffer vertexBuf;
-    VkDeviceMemory vertexBufMem;
+    Shader shader("shaders/vert.glsl", "shaders/frag.glsl");
 
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = sizeof(vertices[0]) * vertices.size();
-    bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    std::vector<float> vertices;
+    std::vector<unsigned int> indices;
 
-    if (vkCreateBuffer(render.getRenderer().device, &bufferInfo, nullptr, &vertexBuf) != VK_SUCCESS) {
-            std::cerr << "CREATE BUFFER ERR" << std::endl;
-            window.~Window(); // kill yourself! (literally)
-            render.~VkRender(); // kill yourself! (literally)
-            THROW();
+    if (!loadModel("untitled.glb", vertices, indices)) {
+        std::cerr << "Load model fail" << std::endl;
+        std::runtime_error("Load model fail");
+        std::exit(-1);
     }
 
-    VkMemoryRequirements memReq;
-    vkGetBufferMemoryRequirements(render.getRenderer().device, vertexBuf, &memReq);
+    Object object(vertices, indices, shader);
 
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memReq.size;
-    allocInfo.memoryTypeIndex = render.findMemoryType(memReq.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    if (vkAllocateMemory(render.getRenderer().device, &allocInfo, nullptr, &vertexBufMem) != VK_SUCCESS) {
-        std::cerr << "ALLOCATE BUFFER MEM ERR" << std::endl;
-        window.~Window(); // kill yourself! (literally)
-        render.~VkRender(); // kill yourself! (literally)
-        THROW();
-    }
-
-    vkBindBufferMemory(render.getRenderer().device, vertexBuf, vertexBufMem, 0);
-
-    void* data;
-    vkMapMemory(render.getRenderer().device, vertexBufMem, 0, bufferInfo.size, 0, &data);
-    std::memcpy(data, vertices.data(), (std::size_t) bufferInfo.size);
-    vkUnmapMemory(render.getRenderer().device, vertexBufMem);
-
-    int currentFrame = 0;
     bool running = true;
     SDL_Event event;
     while (running) {
-        Renderer renderer = render.getRenderer();
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = false;
         }
 
-        vkWaitForFences(renderer.device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-        vkResetFences(renderer.device, 1, &inFlightFences[currentFrame]);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-        uint32_t imageIndex = 0;
-        VkResult result = vkAcquireNextImageKHR(renderer.device, renderer.swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        object.draw();
 
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            //shit
-            std::cout << "outta date!" << std::endl;
-        } else if (result != VK_SUCCESS) {
-            std::cerr << "SWAPCHAIN ACQUIRE NEXT IMAGE ERR" << std::endl;
-            window.~Window();
-            render.~VkRender();
-            THROW();
-        }
-
-        VkCommandBufferBeginInfo beginInfo = {};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-
-        vkBeginCommandBuffer(renderer.commandBuffers[imageIndex], &beginInfo);
-
-        VkRenderPassBeginInfo renderPassInfo = {};
-        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        renderPassInfo.renderPass = renderer.rp.renderPass;
-        renderPassInfo.framebuffer = renderer.swapchainFramebuffers[imageIndex];
-        renderPassInfo.renderArea.offset = { 0, 0 };
-        renderPassInfo.renderArea.extent = renderer.vkbSwapchain.extent;
-
-        VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
-
-        vkCmdBeginRenderPass(renderer.commandBuffers[imageIndex], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(renderer.commandBuffers[imageIndex], VK_PIPELINE_BIND_POINT_GRAPHICS, renderer.pipeline.pipeline);
-
-        VkBuffer vertexBuffers[] = { vertexBuf };
-        VkDeviceSize offsets[] = { 0 };
-        vkCmdBindVertexBuffers(renderer.commandBuffers[imageIndex], 0, 1, vertexBuffers, offsets);
-
-        vkCmdDraw(renderer.commandBuffers[imageIndex], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
-        vkCmdEndRenderPass(renderer.commandBuffers[imageIndex]);
-
-        if (vkEndCommandBuffer(renderer.commandBuffers[imageIndex]) != VK_SUCCESS) {
-            std::cerr << "END CMD BUFFER ERR" << std::endl;
-            window.~Window();
-            render.~VkRender();
-            THROW();
-        }
-
-        VkSubmitInfo subInfo = {};
-        subInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-        VkSemaphore waitSemas[] = { imageAvailableSemaphores[currentFrame] };
-        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-        //subInfo.waitSemaphoreCount = 2;
-        //subInfo.pWaitSemaphores = waitSemas;
-        //subInfo.pWaitDstStageMask = waitStages;
-
-        subInfo.commandBufferCount = 1;
-        subInfo.pCommandBuffers = &renderer.commandBuffers[imageIndex];
-
-        VkSemaphore signalSemas[] = { renderFinishedSemaphores[currentFrame] };
-        //subInfo.signalSemaphoreCount = 1;
-        //subInfo.pSignalSemaphores = signalSemas;
-
-        vkResetFences(renderer.device, 1, &inFlightFences[currentFrame]);
-
-        //std::cout << *renderer.commandBuffers[imageIndex] << std::endl;
-
-        if (vkQueueSubmit(renderer.gfxQueue, 1, &subInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-            std::cerr << "GFX QUEUE SUBMIT ERR" << std::endl;
-            window.~Window();
-            render.~VkRender();
-            THROW();
-        }
-
-        VkPresentInfoKHR presInfo = {};
-        presInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        //presInfo.waitSemaphoreCount = 1;
-        //presInfo.pWaitSemaphores = signalSemas;
-
-        VkSwapchainKHR swapchains[] = { renderer.swapchain };
-        presInfo.swapchainCount = 1;
-        presInfo.pSwapchains = swapchains;
-        presInfo.pImageIndices = &imageIndex;
-
-        result = vkQueuePresentKHR(renderer.gfxQueue, &presInfo);
-
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            //boring
-            std::cout << "outta date!" << std::endl;
-        } else if (result != VK_SUCCESS) { //fun
-            std::cerr << "GFX QUEUE PRESENT ERR" << std::endl;
-            window.~Window();
-            render.~VkRender();
-            THROW();
-        }
-
-        std::cout << "frame " << currentFrame << std::endl;
-        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-    }
-
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroySemaphore(render.getRenderer().device, imageAvailableSemaphores[i], nullptr);
-        vkDestroySemaphore(render.getRenderer().device, renderFinishedSemaphores[i], nullptr);
-        vkDestroyFence(render.getRenderer().device, inFlightFences[i], nullptr);
+        SDL_GL_SwapWindow(window.getContext().window);
     }
 
     return EXIT_SUCCESS;

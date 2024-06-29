@@ -62,7 +62,14 @@
         "sstream": "cpp",
         "cinttypes": "cpp",
         "variant": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "any": "cpp",
+        "codecvt": "cpp",
+        "forward_list": "cpp",
+        "map": "cpp",
+        "iomanip": "cpp",
+        "ranges": "cpp",
+        "valarray": "cpp"
     },
     "makefile.launchConfigurations": [
         {
@@ -75,4 +82,5 @@
     "C_Cpp.default.intelliSenseMode": "linux-clang-x64",
     "C_Cpp.default.cppStandard": "c++23",
     "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+    "C_Cpp.errorSquiggles": "disabled",
 }

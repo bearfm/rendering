@@ -1,12 +1,13 @@
 #pragma once
 #include <iostream>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
+#include <SDL2/SDL_opengl.h>
 #include "../error.hpp"
 #include "../constants.hpp"
 
 struct WindowContext {
     SDL_Window* window;
+    SDL_GLContext glContext;
 };
 
 class Window {
